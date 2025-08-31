@@ -22,3 +22,51 @@ model ticks {
   time      BigInt
   quantity  String
 }
+
+model OneMinTicks {
+  id        String      @id @default(uuid())
+  tradeId   BigInt  
+  asset     String
+  open      String
+  high      String
+  low       String
+  close     String
+  openTime  BigInt
+  closeTime BigInt
+}
+
+model FiveMinTicks {
+  id        String      @id @default(uuid())
+  tradeId   BigInt  
+  asset     String
+  open      String
+  high      String
+  low       String
+  close     String
+  openTime  BigInt
+  closeTime BigInt
+}
+
+model TenMinTicks {
+  id        String      @id @default(uuid())
+  tradeId   BigInt  
+  asset     String
+  open      String
+  high      String
+  low       String
+  close     String
+  openTime  BigInt
+  closeTime BigInt
+}
+
+model ThirtyMinTicks {
+  id        String      @id @default(uuid())
+  tradeId   BigInt  
+  asset     String
+  open      String
+  high      String
+  low       String
+  close     String
+  openTime  BigInt
+  closeTime BigInt
+}
