@@ -21,6 +21,7 @@ model ticks {
   price     String
   time      BigInt
   quantity  String
+  createdAt DateTime    @default(now())
 }
 
 model OneMinTicks {
@@ -33,6 +34,7 @@ model OneMinTicks {
   close     String
   openTime  BigInt
   closeTime BigInt
+  createdAt DateTime    @default(now())
 }
 
 model FiveMinTicks {
@@ -45,6 +47,7 @@ model FiveMinTicks {
   close     String
   openTime  BigInt
   closeTime BigInt
+  createdAt DateTime    @default(now())
 }
 
 model TenMinTicks {
@@ -57,6 +60,7 @@ model TenMinTicks {
   close     String
   openTime  BigInt
   closeTime BigInt
+  createdAt DateTime    @default(now())
 }
 
 model ThirtyMinTicks {
@@ -69,4 +73,5 @@ model ThirtyMinTicks {
   close     String
   openTime  BigInt
   closeTime BigInt
+  createdAt DateTime    @default(now())
 }

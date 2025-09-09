@@ -52,6 +52,8 @@ function processCandles(tick: TradePayload) {
         close: tick.price,
         openTime: candleStartTime,
         closeTime: candleEndTime,
+        // Track the earliest trade time observed for correct open
+        firstTradeTime: time,
       };
       currentCandles[timeframe as keyof typeof INTERVALS].set(
         candleKey,
@@ -60,6 +62,12 @@ function processCandles(tick: TradePayload) {
     } else {
       const highNum = parseFloat(candle.high);
       const lowNum = parseFloat(candle.low);
+
+      // Correct open if an earlier trade (by timestamp) arrives out-of-order
+      if (time < candle.firstTradeTime) {
+        candle.open = tick.price;
+        candle.firstTradeTime = time;
+      }
 
       candle.high = priceNum > highNum ? tick.price : candle.high;
       candle.low = priceNum < lowNum ? tick.price : candle.low;
@@ -131,13 +139,13 @@ async function uploadToDataBase(items: TradePayload[]) {
 }
 
 function batchProcessor(item: TradePayload) {
-  batch.push(item);
+  // batch.push(item);
   processCandles(item);
 
-  if (batch.length >= BATCH_SIZE) {
-    const upload = batch.splice(0, BATCH_SIZE);
-    uploadToDataBase(upload);
-  }
+  // if (batch.length >= BATCH_SIZE) {
+  //   const upload = batch.splice(0, BATCH_SIZE);
+  //   uploadToDataBase(upload);
+  // }
 }
 
 setInterval(() => {
@@ -154,6 +162,59 @@ setInterval(() => {
     }
   });
 }, 60000);
+
+// Retention policy: periodically prune old data (fallback if TimescaleDB policies aren't used)
+const RETENTION = {
+  ticksMs: 24 * 60 * 60 * 1000,        // 24 hours
+  oneMinMs: 30 * 24 * 60 * 60 * 1000,  // 30 days
+  fiveMinMs: 90 * 24 * 60 * 60 * 1000, // 90 days
+  tenMinMs: 180 * 24 * 60 * 60 * 1000, // 180 days
+  thirtyMinMs: 365 * 24 * 60 * 60 * 1000, // 365 days
+};
+
+async function retentionCleanup() {
+  try {
+    const nowMs = Date.now();
+
+    const ticksThreshold = BigInt(nowMs - RETENTION.ticksMs);
+    const oneMinThreshold = BigInt(nowMs - RETENTION.oneMinMs);
+    const fiveMinThreshold = BigInt(nowMs - RETENTION.fiveMinMs);
+    const tenMinThreshold = BigInt(nowMs - RETENTION.tenMinMs);
+    const thirtyMinThreshold = BigInt(nowMs - RETENTION.thirtyMinMs);
+
+    const [d1, d2, d3, d4, d5] = await Promise.all([
+      prisma.ticks.deleteMany({ where: { time: { lt: ticksThreshold } } }),
+      prisma.oneMinTicks.deleteMany({ where: { openTime: { lt: oneMinThreshold } } }),
+      prisma.fiveMinTicks.deleteMany({ where: { openTime: { lt: fiveMinThreshold } } }),
+      prisma.tenMinTicks.deleteMany({ where: { openTime: { lt: tenMinThreshold } } }),
+      prisma.thirtyMinTicks.deleteMany({ where: { openTime: { lt: thirtyMinThreshold } } }),
+    ]);
+
+    if (
+      (d1.count ?? 0) + (d2.count ?? 0) + (d3.count ?? 0) + (d4.count ?? 0) + (d5.count ?? 0) >
+      0
+    ) {
+      console.log(
+        "Retention cleanup:",
+        JSON.stringify({
+          ticks: d1.count,
+          oneMin: d2.count,
+          fiveMin: d3.count,
+          tenMin: d4.count,
+          thirtyMin: d5.count,
+        })
+      );
+    }
+  } catch (err) {
+    console.error("Retention cleanup error:", err);
+  }
+}
+
+// Run retention cleanup every 15 minutes, with initial delay of 1 minute
+setTimeout(() => {
+  retentionCleanup();
+  setInterval(retentionCleanup, 15 * 60 * 1000);
+}, 60 * 1000);
 
 function poller() {
   const binanceWsUrl =
